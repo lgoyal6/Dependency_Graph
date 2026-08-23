@@ -1,49 +1,77 @@
-# build a tool dependency graph (60-120 mins)
+# Tool Dependency Graph
 
-we care about the quality and structure of the dependency relationships you discover
+**A take-home submission.** The brief was to map, across Composio's Google Super and
+GitHub toolkits, which actions must run before other actions can execute, and to
+visualize the result as a graph.
 
-some actions need precursor actions before being able to execute them
+Some tools cannot be called cold. `GMAIL_REPLY_TO_THREAD` needs a `thread_id`, which
+something like `GMAIL_LIST_THREADS` has to produce first. "Send an email to Priya"
+needs a contacts lookup before it needs a mail client. An agent executing these
+actions has to know, ahead of time, whether a missing argument should be asked of the
+user or fetched by another call.
 
-a concrete example
+This builds that graph: **677 tools, 3,039 dependency edges** across the two toolkits.
 
-1. the tool `GMAIL_REPLY_TO_THREAD` which needs a `thread_id`
-2. which can be got by `GMAIL_LIST_THREADS` as an example, there could be other ways to get a `thread_id` too
+## What it produces
 
-a second more dense exmaple
-the send email tool needs an email, if you give a name it should fetch the name from contacts and then you can send the email
+Every edge names the parameter that creates the dependency and classifies it:
 
+| Edge type | Count | Meaning |
+|---|---:|---|
+| `required` | 2,837 | The parameter is mandatory and no user can reasonably supply it by hand |
+| `optional` | 190 | The parameter refines the call but the call succeeds without it |
+| `semantic` | 12 | No shared ID, but the intent implies an ordering (name to contact to email) |
 
+Nodes carry a toolkit (431 GitHub, 246 Google Super), a BFS depth from the entry set,
+and entry/terminal flags. Depth is what makes the layout readable rather than a hairball:
+134 tools need nothing, 454 sit one hop in, 82 two, 7 three.
 
-when we agentically execute actions inside composio, we need to know either what info to get from the user or what other action we should take before we execute the action.
+## How it decides
 
-you are supposed to build a dependency graph for this
+A purely heuristic pass over parameter names produces a lot of false edges, because
+`id` in one tool is not `id` in another. A purely LLM pass is slow and unreproducible.
+So it runs both:
 
-to keep this limited in scope, we expect you to only do it for [Google Super](https://docs.composio.dev/toolkits/googlesuper) and [Github](https://docs.composio.dev/toolkits/github)
+1. **`fetch_github.ts`** pulls raw tool schemas through the Composio SDK.
+2. **`llm_analyze.py`** batches tools to an LLM and asks three things per tool: which
+   entity IDs its *output* produces, whether each required parameter is user-supplied
+   or must come from another call, and whether any semantic ordering applies.
+3. **`build_graph.py`** joins the LLM's producer mappings against the heuristic
+   entity-type matches, classifies each edge, tags entry and terminal nodes, and
+   computes BFS depth.
+4. **`gen_html.py`** inlines vis.js and the graph into a single self-contained
+   `index.html`.
 
-the final submission should be a visualized dependency graph where i can see connection (this is not super important just should exist for me to see if graph with edges and nodes)
+The LLM proposes producer relationships; the schema decides whether an edge exists.
+That ordering matters, because the model is confident about mappings that the actual
+parameter list does not support.
 
-## get started
+## Run it
 
-1. go to https://platform.composio.dev and get an api key
-2. run `COMPOSIO_API_KEY=PUT_YOUR_KEY_HERE sh scaffold.sh` will give you an **openrouter-key**
-3. check `src/index.ts` to see how to fetch full google raw tools (fastest way to run is https://bun.sh/)
+```bash
+bun install
+COMPOSIO_API_KEY=... bun src/index.ts        # fetch Google Super tool schemas
+COMPOSIO_API_KEY=... bun src/fetch_github.ts # fetch GitHub tool schemas
+OPENROUTER_API_KEY=... python3 src/llm_analyze.py
+python3 src/build_graph.py
+python3 src/gen_html.py                      # writes index.html
+```
 
-you can implement this with whatever language you want, feel free to use language models and coding tools
+Open `index.html` in a browser. Both `index.html` and `dependency_graph.json` are
+checked in, so the graph can be read without re-running any of the above.
 
-## submit
+`gen_html.py` inlines `vis-network.min.js` from the repo root. That file is not checked
+in, so regenerating the page means downloading it first:
 
-once you are done use `sh upload.sh <your_email> [--skip-session]`
+```bash
+curl -o vis-network.min.js https://unpkg.com/vis-network/standalone/umd/vis-network.min.js
+```
 
-## agent session tracing (required by default)
+## Limits
 
-- `upload.sh` collects recent local agent sessions into `agent-sessions/` before creating your submission zip.
-- It includes recent activity from this task folder for Codex, Claude Code, OpenCode, and Cursor (90-minute window).
-- If no recent sessions are found, interactive runs prompt you before continuing.
-- Use `--skip-session` only if you explicitly want to upload without session tracing.
-
-examples:
-
-- `sh upload.sh your_email@example.com`
-- `sh upload.sh your_email@example.com --skip-session`
-
-NOTE:  Feel free to use LLM, you will be judged by the quality of output, eval...
+- Two toolkits only, which is the scope the brief set.
+- The `semantic` edges are the least reliable class and the smallest. They encode
+  intent rather than a shared identifier, so they are the ones to audit first.
+- Producer mappings come from a model reading a schema, not from executing the tool.
+  An edge asserts that a tool's output *should* contain an entity, not that a live
+  call was observed returning one.
