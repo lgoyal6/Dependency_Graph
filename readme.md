@@ -1,8 +1,7 @@
 # Tool Dependency Graph
 
-**A take-home submission.** The brief was to map, across Composio's Google Super and
-GitHub toolkits, which actions must run before other actions can execute, and to
-visualize the result as a graph.
+Which actions must run before other actions can execute, across Composio's Google
+Super and GitHub toolkits, and what that ordering looks like as a graph.
 
 Some tools cannot be called cold. `GMAIL_REPLY_TO_THREAD` needs a `thread_id`, which
 something like `GMAIL_LIST_THREADS` has to produce first. "Send an email to Priya"
@@ -69,7 +68,8 @@ curl -o vis-network.min.js https://unpkg.com/vis-network/standalone/umd/vis-netw
 
 ## Limits
 
-- Two toolkits only, which is the scope the brief set.
+- Two toolkits only, Google Super and GitHub. Each is fetched by its own script
+  (`src/index.ts`, `src/fetch_github.ts`), so a third needs one more of those.
 - The `semantic` edges are the least reliable class and the smallest. They encode
   intent rather than a shared identifier, so they are the ones to audit first.
 - Producer mappings come from a model reading a schema, not from executing the tool.
