@@ -1,0 +1,14 @@
+Tool Dependency Graph
+Copyright 2026 Laksh Goyal
+
+The code in this repository is licensed under the MIT License (see LICENSE).
+
+------------------------------------------------------------------------------
+Composio toolkit definitions
+
+dependency_graph.json, and the tool names, parameter names and descriptions
+inside index.html, are derived from Composio's published Google Super and GitHub
+toolkit definitions. That underlying material is Composio's, not mine, and the
+MIT grant above does not extend to it. What is mine is the dependency analysis
+built on top: which action must precede which, the parameter that forces each
+ordering, and the required/optional/semantic classification.
