@@ -23,7 +23,10 @@ Every edge names the parameter that creates the dependency and classifies it:
 
 Nodes carry a toolkit (431 GitHub, 246 Google Super), a BFS depth from the entry set,
 and entry/terminal flags. Depth is what makes the layout readable rather than a hairball:
-134 tools need nothing, 454 sit one hop in, 82 two, 7 three.
+134 sit at depth 0, 454 one hop in, 82 two, 7 three. Depth 0 is not the same as
+"needs nothing": only 90 tools have no incoming edge at all. The other 44 are nodes
+the BFS never reached from the entry set, and they fall back to depth 0 rather than
+being marked unreachable.
 
 ## How it decides
 
