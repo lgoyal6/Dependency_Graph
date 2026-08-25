@@ -1,0 +1,17 @@
+# bun
+node_modules/
+bun.lockb
+bun.lock
+
+# Intermediate pipeline output. dependency_graph.json and index.html are the
+# two artifacts that ARE checked in, so the graph reads without a re-run.
+googlesuper_tools.json
+github_tools.json
+llm_analysis.json
+
+# Downloaded by the curl line in the readme, inlined into index.html by gen_html.py
+vis-network.min.js
+
+# python
+__pycache__/
+*.pyc
