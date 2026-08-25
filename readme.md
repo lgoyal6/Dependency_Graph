@@ -45,6 +45,39 @@ The LLM proposes producer relationships; the schema decides whether an edge exis
 That ordering matters, because the model is confident about mappings that the actual
 parameter list does not support.
 
+## What makes an edge
+
+Three passes write into one edge set, and the schema, not the model, has the last word.
+
+```mermaid
+flowchart TD
+  FETCH["src/index.ts and src/fetch_github.ts:<br/>Composio getRawComposioTools, one JSON file per toolkit"] --> LLM
+  FETCH --> P1
+  LLM["llm_analyze.py: batches of 15 tools to gpt-4o-mini<br/>through OpenRouter, grouped by service, resumable.<br/>A batch that errors is written back empty and never retried"] --> MERGE
+  HEUR["HEURISTIC_PRODUCERS: 61 hand-written parameter names,<br/>snake and camel, mapped to the tools that return them"] --> MERGE
+  MERGE["merged_producers, parameter name to producing tools.<br/>The model can add producers for a name, never replace them"] --> P1
+
+  P1{"pass 1, for each input parameter of each tool:<br/>is it in merged_producers and not one<br/>of the 37 USER_PARAMS?"}
+  P1 -->|no| NONE["no edge: a user can reasonably supply this"]
+  P1 -->|yes| REQ{"is the parameter in the<br/>schema's required list?"}
+  REQ -->|no| OPT["optional"]
+  REQ -->|yes| SEMQ{"did the model label this<br/>parameter semantic?"}
+  SEMQ -->|yes| OPT
+  SEMQ -->|no| RQ["required"]
+
+  P2["pass 2: the model's semantic_deps, one edge each"] --> ADD
+  P3["pass 3: 105 hand-written EXPLICIT_CHAINS"] --> ADD
+  OPT --> ADD
+  RQ --> ADD
+  ADD["add_edge, deduplicated on the from-to pair alone"] --> POST
+  POST["entry = no incoming edge, 90 tools.<br/>terminal = no outgoing edge, 456 tools.<br/>depth = BFS from the entries; a node the BFS<br/>never reaches keeps the default depth of 0"] --> OUT["dependency_graph.json, then gen_html.py<br/>inlines vis.js and the graph into index.html"]
+```
+
+Because the dedup key is the pair and not the parameter, only the first parameter to
+connect two tools is recorded, and a hand-written chain in pass 3 is dropped when pass 1
+already emitted that pair under a different name. The `param` on an edge is therefore one
+reason the ordering exists, not the only one.
+
 ## Run it
 
 ```bash
